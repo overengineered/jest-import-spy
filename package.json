@@ -1,0 +1,21 @@
+{
+  "name": "jest-import-spy",
+  "version": "1.0.0",
+  "description": "Observe module imports in Jest tests",
+  "main": "index.js",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/overengineered/jest-import-spy.git"
+  },
+  "keywords": [
+    "jest",
+    "require",
+    "import"
+  ],
+  "author": "Juozas Kontvainis",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/overengineered/jest-import-spy/issues"
+  },
+  "homepage": "https://github.com/overengineered/jest-import-spy#readme"
+}

@@ -1,0 +1,21 @@
+# Enables verification of imports in Jest tests
+
+## Usage
+
+```JavaScript
+// Jest config
+{
+  "moduleLoader": "jest-import-spy"
+}
+```
+
+```TypeScript
+import {collectImports} from 'jest-import-spy';
+
+test('imports', () => {
+  const imports = collectImports(() => {
+    require('./sample');
+  });
+  expect(imports).toEqual(['lodash', './src/config']);
+});
+```
