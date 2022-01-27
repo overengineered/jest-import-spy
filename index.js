@@ -154,4 +154,17 @@ class ModuleImportSpy extends Base {
   }
 }
 
-module.exports = ModuleImportSpy;
+const unsupportedUse = `'jest-import-spy' is designed to be loaded through moduleLoader option in Jest config, see https://github.com/overengineered/jest-import-spy#usage`;
+
+module.exports = Object.defineProperties(ModuleImportSpy, {
+  collectImports: {
+    get: () => {
+      console.log(unsupportedUse);
+      return () => {
+        throw new Error(unsupportedUse);
+      };
+    },
+  },
+  moduleList: { value: moduleList },
+  impactGraph: { value: impactGraph },
+});
