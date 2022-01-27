@@ -1,4 +1,4 @@
-# Enables verification of imports in Jest tests
+# Enables inspecting imports in Jest tests
 
 ## Usage
 
@@ -14,8 +14,8 @@ import {collectImports} from 'jest-import-spy';
 
 test('imports', () => {
   const imports = collectImports(() => {
-    require('./sample');
+    require('./src');
   });
-  expect(imports).toEqual(['lodash', './src/config']);
+  expect(imports).toEqual(['./src/config', 'lodash']);
 });
 ```
