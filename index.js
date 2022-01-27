@@ -108,16 +108,33 @@ function formatInt(value, length) {
     : formatted;
 }
 
+function withCleanup(task, onFinished) {
+  let shouldCleanup = false;
+  try {
+    shouldCleanup = true;
+    const output = task();
+    shouldCleanup = !(typeof output === "object" && "then" in output);
+    if (!shouldCleanup) {
+      return output.then(onFinished).catch((error) => {
+        onFinished();
+        throw error;
+      });
+    }
+  } finally {
+    if (shouldCleanup) {
+      onFinished();
+    }
+  }
+}
+
 function execute(fn, processResults) {
   const measurements = [];
   const recorder = (measurement) => measurements.push(measurement);
   observers.add(recorder);
-  try {
-    fn();
-  } finally {
-    observers.delete(recorder);
-  }
-  return processResults(measurements);
+  const promise = withCleanup(fn, () => void observers.delete(recorder));
+  return promise
+    ? promise.then(() => processResults(measurements))
+    : processResults(measurements);
 }
 
 class ModuleImportSpy extends Base {

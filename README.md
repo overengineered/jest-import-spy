@@ -14,7 +14,9 @@ import {collectImports} from 'jest-import-spy';
 
 test('imports', () => {
   const imports = collectImports(() => {
-    require('./src');
+    jest.isolateModules(() => {
+      require('./src');
+    });
   });
   expect(imports).toEqual(['./src/config', 'lodash']);
 });

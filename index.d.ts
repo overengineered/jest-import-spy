@@ -21,9 +21,12 @@ type Interpreter = (imports: Measurement[]) => string[];
 
 type CollectorOptions = ListOptions | { output?: Interpreter };
 
-type Collector1 = (fn: () => void) => string[];
-type Collector2 = (options: CollectorOptions, fn: () => void) => string[];
+type AsyncFn = () => Promise<any>;
+type Collect1A = (fn: AsyncFn) => Promise<string[]>;
+type Collect1 = (fn: () => void) => string[];
+type Collect2A = (options: Options, fn: AsyncFn) => Promise<string[]>;
+type Collect2 = (options: Options, fn: () => void) => string[];
 
-export const collectImports: Collector1 & Collector2;
+export const collectImports: Collect1A & Collect1 & Collect2A & Collect2;
 export const moduleList: (options?: ListOptions) => Interpreter;
 export const impactGraph: (options?: ImpactOptions) => Interpreter;
