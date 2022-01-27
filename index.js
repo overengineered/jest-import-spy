@@ -7,8 +7,8 @@ function collectImports(fnOrOptions, maybeFn) {
   const options = typeof fnOrOptions === "function" ? {} : fnOrOptions;
   const fn = typeof fnOrOptions === "function" ? fnOrOptions : maybeFn;
   const processor = options.output ? options.output : moduleList(options);
-  const produceResult = isStandardProcessor(processor) ? processor() : processor;
-  return execute(fn, produceResult);
+  const analyze = isStandardProcessor(processor) ? processor() : processor;
+  return execute(fn, analyze);
 }
 
 function modulePath(from, moduleName) {
@@ -122,14 +122,16 @@ function execute(fn, processResults) {
 
 class ModuleImportSpy extends Base {
   init = Date.now();
-  measurements = [];
   cause = "jest";
 
   requireModule(from, moduleName, options) {
     if (moduleName === "jest-import-spy") {
       return { collectImports, moduleList, impactGraph };
-    } else if (moduleName === "jest-import-spy/timing") {
-      return this.measurements;
+    }
+
+    const baseImplementation = Base.prototype.requireModule;
+    if (observers.size === 0) {
+      return baseImplementation.call(this, from, moduleName, options);
     }
 
     const source = moduleName ? { file: "./" + path.relative(".", from) } : {};
@@ -138,7 +140,6 @@ class ModuleImportSpy extends Base {
 
     const start = Date.now();
     this.cause = target;
-    const baseImplementation = Base.prototype.requireModule;
     const result = baseImplementation.call(this, from, moduleName, options);
     this.cause = title;
     const end = Date.now();
