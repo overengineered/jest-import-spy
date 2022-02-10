@@ -1,6 +1,6 @@
 {
   "name": "jest-import-spy",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "description": "Observe module imports in Jest tests",
   "main": "index.js",
   "repository": {

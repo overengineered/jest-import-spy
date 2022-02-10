@@ -51,19 +51,29 @@ function moduleList({
   };
 }
 
-function impactGraph() {
+function hasGaps(list) {
+  return list.slice(0, -1).find((node) => node.children.length > 0);
+}
+
+function impactGraph({ minDuration = 200 } = {}) {
   return (all) => {
-    const measurements = all.filter((it) => it.duration >= 80);
+    const measurements = all.filter((it) => it.duration >= minDuration);
     const selectMax = (max, it) => Math.max(formatInt(it.duration).length, max);
     const maxDurationChars = measurements.reduce(selectMax, 1);
     const tree = buildTree(measurements);
     const result = [];
     tree.forEach((root) =>
-      traverse(root, (item, depth) => {
+      traverse(root, (item, tag = { base: "" }) => {
         const duration = formatInt(item.data.duration, maxDurationChars);
-        const indentation = space(depth * 2);
         const moduleName = item.path ?? item.data.target;
-        result.push(`[${duration}] ${indentation}${moduleName}`);
+        const suffix = !tag.endNode ? "  " : tag.endNode === item ? "└ " : "├ ";
+        const indentation = tag.base + (tag.base === "" ? "" : suffix);
+        result.push(`[${duration}] ${indentation.slice(2)}${moduleName}`);
+        const endNode = hasGaps(item.children)
+          ? item.children[item.children.length - 1]
+          : undefined;
+        const ending = tag.endNode && tag.endNode !== item ? "│ " : "  ";
+        return { base: tag.base + ending, endNode };
       })
     );
     return result;
@@ -92,9 +102,9 @@ function buildTree(measurements) {
   return Array.from(roots.values());
 }
 
-function traverse(node, visit, depth = 0) {
-  visit(node, depth);
-  node.children.forEach((child) => traverse(child, visit, depth + 1));
+function traverse(node, visit, tag) {
+  const next = visit(node, tag);
+  node.children.forEach((child) => traverse(child, visit, next));
 }
 
 function space(count) {
