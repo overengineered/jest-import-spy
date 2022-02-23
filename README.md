@@ -18,6 +18,6 @@ test('imports', () => {
       require('./src');
     });
   });
-  expect(imports).toEqual(['./src/config', 'lodash']);
+  expect(imports).toEqual(['./src/index.js', './src/utils.js', 'lodash']);
 });
 ```

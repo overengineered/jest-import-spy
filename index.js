@@ -22,6 +22,7 @@ function modulePath(from, moduleName) {
 function isSynthetic(moduleName) {
   return (
     moduleName.startsWith("@babel/runtime") ||
+    moduleName.startsWith("regenerator-runtime") ||
     moduleName.startsWith("./node_modules/@babel/runtime")
   );
 }
@@ -55,17 +56,48 @@ function hasGaps(list) {
   return list.slice(0, -1).find((node) => node.children.length > 0);
 }
 
+function detect(regex) {
+  return (all) => {
+    const tree = buildTree(all, (node) => !regex.test(node.data.target));
+    const results = new Map();
+    tree.forEach((root) =>
+      traverse(
+        root,
+        (item, { withHead = () => "", depth = 0, source = "" } = {}) => {
+          const id = item.data.target;
+          const match = regex.exec(id);
+          if (match) {
+            const combo = source + "+++" + id;
+            const markedId =
+              id.slice(0, match.index) +
+              "\x1b[4m" +
+              match[0] +
+              "\x1b[24m" +
+              id.slice(match.index + match[0].length);
+            if (!results.has(combo) || results.get(combo)[0] > depth) {
+              results.set(combo, [depth, withHead(markedId).substring(3)]);
+            }
+          }
+          const buildPath = (next) => `${withHead(item.path)} ➤ ${next}`;
+          return { withHead: buildPath, depth: depth + 1, source: id };
+        }
+      )
+    );
+    return [...results.values()].map((a) => a[1]);
+  };
+}
+
 function impactGraph({ minDuration = 200 } = {}) {
   return (all) => {
-    const measurements = all.filter((it) => it.duration >= minDuration);
+    const list = all.filter((it) => !isSynthetic(it.target));
     const selectMax = (max, it) => Math.max(formatInt(it.duration).length, max);
-    const maxDurationChars = measurements.reduce(selectMax, 1);
-    const tree = buildTree(measurements);
+    const maxDurationChars = list.reduce(selectMax, 1);
+    const tree = buildTree(list, (_, it) => it.data.duration >= minDuration);
     const result = [];
     tree.forEach((root) =>
       traverse(root, (item, tag = { base: "" }) => {
         const duration = formatInt(item.data.duration, maxDurationChars);
-        const moduleName = item.path ?? item.data.target;
+        const moduleName = item.description ?? item.data.target;
         const suffix = !tag.endNode ? "  " : tag.endNode === item ? "└ " : "├ ";
         const indentation = tag.base + (tag.base === "" ? "" : suffix);
         result.push(`[${duration}] ${indentation.slice(2)}${moduleName}`);
@@ -80,26 +112,47 @@ function impactGraph({ minDuration = 200 } = {}) {
   };
 }
 
-function buildTree(measurements) {
+function description(target, path) {
+  return target.startsWith(".") ? path : `${target} (${path})`;
+}
+
+function within(range, slot) {
+  return (
+    slot.offset >= range.offset && slot.offset <= range.offset + range.duration
+  );
+}
+
+function buildTree(measurements, shouldAttach) {
   const nodes = [];
   const roots = new Set();
+  const detached = new Set();
   measurements.forEach((data) => {
     const node = { data, children: [] };
     roots.add(node);
     nodes.forEach((other) => {
-      if (other.data.target === data.title) {
+      if (other.data.target === data.title && within(other.data, data)) {
         other.path = data.file;
-        other.children.push(node);
-        roots.delete(node);
-      } else if (other.data.title === data.target) {
+        other.description = description(other.data.target, data.file);
+        if (shouldAttach(other, node)) {
+          other.children.push(node);
+          roots.delete(node);
+        } else {
+          detached.add(node);
+        }
+      } else if (other.data.title === data.target && within(data, other.data)) {
         node.path = other.data.file;
-        node.children.push(other);
-        roots.delete(other);
+        node.description = description(node.data.target, other.data.file);
+        if (shouldAttach(node, other)) {
+          node.children.push(other);
+          roots.delete(other);
+        } else {
+          detached.add(other);
+        }
       }
     });
     nodes.push(node);
   });
-  return Array.from(roots.values());
+  return Array.from(roots.values()).filter((it) => !detached.has(it));
 }
 
 function traverse(node, visit, tag) {
@@ -147,13 +200,30 @@ function execute(fn, processResults) {
     : processResults(measurements);
 }
 
+function measureImports(fnOrOptions, maybeFn) {
+  const [graphOptions, fn] =
+    typeof maybeFn === "function" ? [fnOrOptions, maybeFn] : [{}, fnOrOptions];
+  const options = { output: impactGraph(graphOptions) };
+  const list = collectImports(options, fn);
+  if (list.length > 0) {
+    throw new Error(list.join("\n"));
+  }
+  return [];
+}
+
 class ModuleImportSpy extends Base {
   init = Date.now();
   cause = "jest";
 
   requireModule(from, moduleName, options) {
     if (moduleName === "jest-import-spy") {
-      return { collectImports, moduleList, impactGraph };
+      return {
+        collectImports,
+        measureImports,
+        moduleList,
+        impactGraph,
+        detect,
+      };
     }
 
     const baseImplementation = Base.prototype.requireModule;
@@ -192,6 +262,15 @@ module.exports = Object.defineProperties(ModuleImportSpy, {
       };
     },
   },
+  measureImports: {
+    get: () => {
+      console.log(unsupportedUse);
+      return () => {
+        throw new Error(unsupportedUse);
+      };
+    },
+  },
   moduleList: { value: moduleList },
   impactGraph: { value: impactGraph },
+  detect: { value: detect },
 });
