@@ -5,7 +5,7 @@
 ```JavaScript
 // Jest config
 {
-  "moduleLoader": "jest-import-spy"
+  "runtime": "jest-import-spy"
 }
 ```
 

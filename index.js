@@ -211,9 +211,63 @@ function measureImports(fnOrOptions, maybeFn) {
   return [];
 }
 
+function record(targetFile, beforeAll, afterAll) {
+  const target = path.resolve(targetFile);
+  const measurements = [];
+  let key = "";
+  const recorder = (measurement, testPath) =>
+    void ((key = testPath), measurements.push(measurement));
+  beforeAll(() => observers.add(recorder));
+  afterAll(() => {
+    observers.delete(recorder);
+    if (key) {
+      const imported = new Set();
+      measurements.forEach((it) => {
+        if (
+          it.target.startsWith("./") &&
+          !it.target.includes("/node_modules/")
+        ) {
+          imported.add(it.target);
+        }
+      });
+      const modules = [...imported].sort();
+      const fs = require("fs");
+      const release = require("proper-lockfile").lockSync(target);
+      const prev = JSON.parse(fs.readFileSync(target, "utf8"));
+      const next = Object.assign({}, prev, { [key]: modules });
+      fs.writeFileSync(target, JSON.stringify(next, null, 2));
+      release();
+    }
+  });
+}
+
 class ModuleImportSpy extends Base {
   init = Date.now();
   cause = "jest";
+  testPath = "";
+
+  constructor(
+    config,
+    environment,
+    resolver,
+    transformer,
+    cacheFS,
+    coverageOptions,
+    testPath,
+    globalConfig
+  ) {
+    super(
+      config,
+      environment,
+      resolver,
+      transformer,
+      cacheFS,
+      coverageOptions,
+      testPath,
+      globalConfig
+    );
+    this.testPath = path.relative(".", testPath);
+  }
 
   requireModule(from, moduleName, options) {
     if (moduleName === "jest-import-spy") {
@@ -223,6 +277,7 @@ class ModuleImportSpy extends Base {
         moduleList,
         impactGraph,
         detect,
+        record,
       };
     }
 
@@ -245,13 +300,13 @@ class ModuleImportSpy extends Base {
     const offset = start - this.init;
     const measurement = { title, ...source, target, duration, offset };
 
-    observers.forEach((send) => send(measurement));
+    observers.forEach((send) => send(measurement, this.testPath));
 
     return result;
   }
 }
 
-const unsupportedUse = `'jest-import-spy' is designed to be loaded through moduleLoader option in Jest config, see https://github.com/overengineered/jest-import-spy#usage`;
+const unsupportedUse = `'jest-import-spy' is designed to be loaded through runtime option in Jest config, see https://github.com/overengineered/jest-import-spy#usage`;
 
 module.exports = Object.defineProperties(ModuleImportSpy, {
   collectImports: {
@@ -273,4 +328,5 @@ module.exports = Object.defineProperties(ModuleImportSpy, {
   moduleList: { value: moduleList },
   impactGraph: { value: impactGraph },
   detect: { value: detect },
+  record: { value: record },
 });
