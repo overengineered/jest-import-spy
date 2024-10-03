@@ -211,7 +211,7 @@ function measureImports(fnOrOptions, maybeFn) {
   return [];
 }
 
-function record(targetFile, beforeAll, afterAll) {
+function record(targetFile, beforeAll, afterAll, filter) {
   const target = path.resolve(targetFile);
   const measurements = [];
   let key = "";
@@ -223,10 +223,7 @@ function record(targetFile, beforeAll, afterAll) {
     if (key) {
       const imported = new Set();
       measurements.forEach((it) => {
-        if (
-          it.target.startsWith("./") &&
-          !it.target.includes("/node_modules/")
-        ) {
+        if (!filter || filter(it.target)) {
           imported.add(it.target);
         }
       });
